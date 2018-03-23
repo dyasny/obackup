@@ -55,6 +55,8 @@
   with_items:
     - "{{ obackup_location }}"
     - "{{ obackup_location }}/backup/"
+    - "{{ obackup_location }}/backup/plans"
+    - "{{ obackup_location }}/backup/vms"
     - "{{ backy2_location }}"
     - "{{ backup_mountpoint_path }}"
   tags: create_dirs

@@ -3,6 +3,8 @@
 import os
 import traceback
 import yaml
+from prettytable import PrettyTable
+import sys
 
 try:
     import ovirtsdk4 as sdk
@@ -14,6 +16,122 @@ def connect():
         obackup_path = os.environ['OBACKUP_PATH']
     else:
         obackup_path = "/opt/obackup/"
-    config = obackup_path + "/backup/obackup_config.yml"
+
+    config = obackup_path + "backup/obackup_config.yml"
     with open(config, 'r') as f:
-        conf = yaml.load(f)
+        conf = yaml.load(f.read())
+
+    connection = sdk.Connection(
+        url=conf['ovirt_connectivity']['url'],
+        username=conf['ovirt_connectivity']['user'],
+        password=str(conf['ovirt_connectivity']['password']),
+        ca_file=conf['ovirt_connectivity']['ca_file'],
+        insecure="insecure"
+        )
+    return connection
+
+def load_plan(plan):
+    if os.environ.has_key('OBACKUP_PATH'):
+        obackup_path = os.environ['OBACKUP_PATH']
+    else:
+        obackup_path = "/opt/obackup/"
+    plan_path = obackup_path + "/backup/plans" + plan + ".yml"
+    with open(plan_path, 'r') as f:
+        p = yaml.load(f.read())
+    return p
+
+def save_plan(plan):
+    if os.environ.has_key('OBACKUP_PATH'):
+        obackup_path = os.environ['OBACKUP_PATH']
+    else:
+        obackup_path = "/opt/obackup/"
+    plan_path = obackup_path + "/backup/plans/" + plan['name'] + ".yml"
+    if os.isfile(plan_path):
+        print("Plan %s already exists, will be overwritten" % plan)
+    else:
+        with open(plan_path,'w') as f:
+            f.write(yaml.dump(plan))
+
+def get_vm_list(conn):
+    vms_service = connection.system_service().vms_service()
+    vmlist =  vms_service.list()
+    return vmlist
+
+def get_vm_disks(conn, vm):
+    vms_service = conn.system_service().vms_service()
+    search = ("'name=%s'") % vm
+    vm = vms_service.list(search='name=%s' % vm)[0]
+    vm_service = vms_service.vm_service(vm.id)
+    disk_attachments_service = vm_service.disk_attachments_service()
+    disk_attachments = disk_attachments_service.list()
+    d_a = []
+    for i in disk_attachments:
+        d_a.append(i.id)
+    disks_service = conn.system_service().disks_service()
+    disks = []
+    for i in disks_service.list():
+        if i.id in d_a:
+            disks.append(i)
+    return vm.id, disks
+
+def print_vm_list(conn):
+    vmlist = get_vm_list(conn)
+    t = PrettyTable(['Name', 'ID'])
+    for i in vmlist:
+        t.add_row([i.name, i.id])
+    print t
+
+def print_vm_disks(conn, vm):
+    vmid, vmdisks = get_vm_disks(conn, vm)
+    print("VM Name: %s") % vm
+    print("VM ID: %s") % vmid
+    for disk in vmdisks:
+        print("\nDisk ID: %s\nName: %s\nSize: %sG\nDescription: %s") % (disk.id,
+            disk.name, disk.provisioned_size / (1024*1024*1024),
+            disk.description)
+
+def edit_plan_vm(vm, plan, disks="all"):
+    if disks == "all":
+        edited = False
+        for i in plan['vms']:
+            if i['name'] == vm:
+                i['disks'] = ['all']
+                edited = True
+        if not edited:
+            plan['vms'].append({'name':vm, 'disks':['all']})
+    else:
+        if not isinstance(disks, list):
+            disks = [disks]
+        edited = False
+        for i in plan['vms']:
+            if i['name'] == vm:
+                i['disks'] = disks
+                edited = True
+        if not edited:
+            plan['vms'].append('name':vm, 'disks': disks)
+    if edited:
+        print("Plan %s updated for VM %s") % (plan, vm)
+    else:
+        print("VM %s added to plan %s") % (vm, plan)
+    return plan
+
+def run_scheduler(plan, now=False):
+    pass
+
+def run_plan(conn, plan_name):
+    plan = load_plan(plan_name)
+    try:
+        if not plan['name'] == plan_name:
+            print("Invalid plan %s specified, exiting") % plan_name
+            sys.exit(1)
+    except Exception, e:
+        print("Unknown exception")
+    for vm in plan['vms']:
+        vmname = vm['name']
+        vmid, disks = get_vm_disks(conn, vmname)
+        if vm['disks'] != ['all']:
+            disks = vm['disks']
+        backup_vm(conn, vmname, vmid, disks)
+
+def backup_vm(conn, vm, vmid, disks):
+    pass
