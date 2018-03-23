@@ -1,0 +1,7 @@
+---
+- name: Configure the executor
+  hosts: "{{ vm_name }}"
+  vars_files:
+    - group_vars/all
+  roles:
+    - get_disks_details

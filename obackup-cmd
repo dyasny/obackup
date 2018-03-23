@@ -1,0 +1,19 @@
+#!/bin/env python
+
+import os
+import traceback
+import yaml
+
+try:
+    import ovirtsdk4 as sdk
+except ImportError:
+    pass
+
+def connect():
+    if os.environ.has_key('OBACKUP_PATH'):
+        obackup_path = os.environ['OBACKUP_PATH']
+    else:
+        obackup_path = "/opt/obackup/"
+    config = obackup_path + "/backup/obackup_config.yml"
+    with open(config, 'r') as f:
+        conf = yaml.load(f)

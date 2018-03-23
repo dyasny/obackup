@@ -1,0 +1,7 @@
+---
+- name: Remove snapshot
+  hosts: "{{ vm_name }}"
+  vars_files:
+    - group_vars/all
+  roles:
+    - remove_snapshot

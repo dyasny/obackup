@@ -1,0 +1,5 @@
+---
+# tasks file for configure_appliance
+- name: Get VM details
+  import_tasks: get_vm_details.yml
+  tags: get_vm_details

@@ -1,0 +1,28 @@
+---
+
+- name: Configure and test oVirt connectivity
+  block:
+    - name: Obtain SSO token with using username/password credentials
+      ovirt_auth:
+        url: "https://{{ engine_fqdn }}/ovirt-engine/api"
+        username: "{{ ovirt_user }}"
+        ca_file: "{{obackup_location}}/ca.crt"
+        password: "{{ ovirt_password }}"
+        timeout: 180
+        insecure: true
+
+    - name: Get VM info
+      ovirt_vms_facts:
+        auth: "{{ ovirt_auth }}"
+        pattern: name="{{ target_vm }}"
+        fetch_nested: yes
+        nested_attributes: "disk_attachments,nics"
+
+  always:
+    - name: Always revoke the SSO token
+      ovirt_auth:
+        state: absent
+        ovirt_auth: "{{ ovirt_auth }}"
+
+- debug:
+    var: ovirt_vms

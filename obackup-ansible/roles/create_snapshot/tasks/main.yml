@@ -1,0 +1,4 @@
+---
+- name: Create snapshot
+  import_tasks: create_snapshot.yml
+  tags: create_snapshot

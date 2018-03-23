@@ -1,0 +1,192 @@
+---
+- name: Install the required RPMs
+  block:
+    - name: Install additional repos
+      yum:
+        name: "{{ item }}"
+        state: installed
+      become: true
+      with_items:
+        - epel-release
+        - "{{ ovirt_release_repos }}"
+
+    - name: Install dependencies
+      yum:
+        name: "{{ item }}"
+        state: installed
+      become: true
+      with_items:
+        - qemu-img
+        - python-ovirt-engine-sdk4
+        - python-requests
+        - git
+        - ovirt-guest-agent
+        - wget
+        - curl
+        - sg3_utils
+        - lsscsi
+        - sendmail
+        - pv
+        - python34
+        - python34-debug
+        - python34-devel
+        - python34-libs
+        - python34-tools
+        - python34-setuptools
+        - gcc
+        - ansible
+
+    - name: Inject xml2json
+      copy:
+        src: xml2json
+        dest: /usr/bin/xml2json
+        owner: root
+        group: root
+        mode: u=rwx,g=rx,o=rx
+
+  tags: install_prerequisites
+
+- name: Create the software locations
+  file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  become: true
+  with_items:
+    - "{{ obackup_location }}"
+    - "{{ obackup_location }}/backup/"
+    - "{{ backy2_location }}"
+    - "{{ backup_mountpoint_path }}"
+  tags: create_dirs
+
+- name: Switch SELinux to permissive
+  selinux:
+    policy: targeted
+    state: permissive
+  become: true
+
+- name: Disable SELinux (yes yes I know)
+  selinux:
+    state: disabled
+  become: true
+
+- name: Configure and test oVirt connectivity
+  block:
+    - name: Download the CA certificate to "{{ obackup_location }}"
+      get_url:
+        url: "https://{{ engine_fqdn }}/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA"
+        dest: "{{ obackup_location }}/ca.crt"
+        mode: 0755
+        validate_certs: no
+      become: true
+
+    - name: Obtain SSO token with using username/password credentials
+      ovirt_auth:
+        url: "https://{{ engine_fqdn }}/ovirt-engine/api"
+        username: "{{ ovirt_user }}"
+        ca_file: "{{obackup_location}}/ca.crt"
+        password: "{{ ovirt_password }}"
+        timeout: 180
+        insecure: true
+
+    - name: Grab a list of DCs and verify it isn't empty
+      ovirt_datacenter_facts:
+        auth: "{{ ovirt_auth }}"
+
+    - debug:
+        var: ovirt_datacenters[0].id
+      failed_when: ovirt_datacenters == []
+
+  always:
+    - name: Always revoke the SSO token
+      ovirt_auth:
+        state: absent
+        ovirt_auth: "{{ ovirt_auth }}"
+  tags: configure_ovirt_connectivity
+
+#TODO: Add other storage types
+- name: Configure NFS client and mountpoint
+  block:
+  #W/A for https://github.com/ansible/ansible/issues/29814
+  - name: Check for mount presence
+    mount:
+      state: present
+      fstype: nfs
+      name: "{{ backup_mountpoint_path }}"
+      src: "{{ nfs_server_address }}:{{ nfs_export_path }}"
+      opts: "vers=4,rw,nodev,hard,intr,hard,intr,sloppy,async"
+    register: mount_info
+    become: true
+
+  - name: If not mounted, mount the exports
+    mount:
+      state: mounted
+      fstype: nfs
+      name: "{{ backup_mountpoint_path }}"
+      src: "{{ nfs_server_address }}:{{ nfs_export_path }}"
+      opts: "vers=4,rw,nodev,hard,intr,hard,intr,sloppy,async"
+    when: mount_info.changed
+    become: true
+  when: backup_storage_type == "nfs"
+  tags: configure_nfs_client
+
+- name: Install and configure backy2
+  block:
+  - name: Clone the backy2 repo
+    git:
+      repo: "{{ backy2_git_repo }}"
+      dest: "{{ backy2_location}}"
+    become: true
+
+  - name: Check for already installed backy2
+    stat:
+      path: /usr/bin/backy2
+    register: backy2_executable
+    become: true
+
+  - name: Build backy2
+    shell: |
+      pushd "{{ backy2_location }}"
+      python3.4 setup.py build
+      python3.4 setup.py install
+    become: true
+    when: not backy2_executable.stat.exists
+
+  - name: Create backy2.cfg
+    template:
+      src: backy2.cfg.j2
+      dest: /etc/backy.cfg
+      mode: 0644
+    become: true
+
+  - name: Check for existing backy2 database
+    stat:
+      path: "{{ backy2_location }}/backy.sqlite"
+    register: backy2_db_file
+
+  - name: Run backy2 initdb
+    shell: |
+      pushd "{{ backy2_location }}"
+      backy2 initdb
+    become: true
+    when: not backy2_db_file.stat.exists
+  tags: install_and_configure_backy2
+
+- name: Configure the initial backup settings
+  block:
+  - name: Find the appliance VM ID
+    shell: |
+      sudo dmidecode -s system-uuid
+    register: appliance_vm_id
+
+  - name: Set default configuration
+    template:
+      src: obackup_config.yml.j2
+      dest: "{{ obackup_location }}/backup/obackup_config.yml"
+    become: true
+
+  # - name: Clone obackup repo
+  #   git:
+  #     repo: https://github.com/dyasny/obackup.git
+  #     dest: "{{ obackup_location }}"
+  #   become: true

@@ -1,0 +1,27 @@
+#General vars
+vm_name: obackup
+
+engine_fqdn: engine-0.example.com
+ovirt_user: "admin@internal"
+ovirt_password: "123456"
+
+ovirt_release_repos: http://resources.ovirt.org/pub/yum-repo/ovirt-release42.rpm
+
+obackup_location: /opt/obackup
+backy2_location: /opt/backy2
+
+backup_mountpoint_path: /mnt/backups
+backup_storage_type: nfs
+nfs_server_address: 10.0.0.16 #Can be FQDN instead
+nfs_export_path: /exports/backup
+
+backy2_git_repo: https://github.com/wamdam/backy2.git
+backy2_log: /var/log/backy2.log
+backy2_block_size: 4194304
+backy2_hash_function: sha512
+backy2_disallow_rm_when_younger_than_days: 3
+#TODO: Enable postgresql in the future
+backy2_database: "sqlite:///{{ backy2_location }}/backy.sqlite"
+
+#Backup specific vars
+target_vm: test1

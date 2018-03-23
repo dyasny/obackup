@@ -1,0 +1,2 @@
+[obackup]
+172.16.0.54 ansible_user=root

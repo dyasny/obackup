@@ -1,0 +1,7 @@
+---
+- name: Create snapshot
+  hosts: "{{ vm_name }}"
+  vars_files:
+    - group_vars/all
+  roles:
+    - create_snapshot

@@ -1,0 +1,4 @@
+---
+- name: get snapshot details
+  import_tasks: get_snapshot_details.yml
+  tags: get_snapshot_details

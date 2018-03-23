@@ -1,0 +1,9 @@
+---
+- ovirt_connectivity:
+    url: https://{{ engine_fqdn }}/ovirt-engine/api
+    user: {{ ovirt_user }}
+    password: {{ ovirt_password }}
+    ca_file: {{ obackup_location }}/ca.crt
+
+- appliance_configuration
+    bkpvm: {{ appliance_vm_id.stdout | lower }}

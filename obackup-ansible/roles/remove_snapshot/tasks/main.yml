@@ -1,0 +1,4 @@
+---
+- name: Remove snapshot
+  import_tasks: remove_snapshot.yml
+  tags: remove_snapshot

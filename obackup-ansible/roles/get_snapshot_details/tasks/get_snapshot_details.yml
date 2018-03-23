@@ -1,0 +1,31 @@
+---
+
+- name: Configure and test oVirt connectivity
+  block:
+    - name: Obtain SSO token with using username/password credentials
+      ovirt_auth:
+        url: "https://{{ engine_fqdn }}/ovirt-engine/api"
+        username: "{{ ovirt_user }}"
+        ca_file: "{{obackup_location}}/ca.crt"
+        password: "{{ ovirt_password }}"
+        timeout: 180
+        insecure: true
+
+    - name: Locate snapshot
+      ovirt_snapshots_facts:
+        auth: "{{ ovirt_auth }}"
+        vm: "{{ target_vm }}"
+        fetch_nested: yes
+        description: obackup_snapshot
+
+    - name: Show snapshot disks
+      shell: |
+        C="`curl -s -k -u "{{ ovirt_user }}:{{ ovirt_password }}" \
+        https://{{ engine_fqdn }}{{ ovirt_snapshots[0].href }}/disks`"
+        echo $C | xml2json -t xml2json --strip_text --strip_namespace
+
+  always:
+    - name: Always revoke the SSO token
+      ovirt_auth:
+        state: absent
+        ovirt_auth: "{{ ovirt_auth }}"

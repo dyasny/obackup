@@ -1,0 +1,5 @@
+---
+# tasks file for configure_appliance
+- name: Configure appliance
+  import_tasks: configure_appliance.yml
+  tags: configure_appliance

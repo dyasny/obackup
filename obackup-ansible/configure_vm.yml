@@ -1,0 +1,9 @@
+#!/usr/bin/ansible-playbook
+---
+- name: Configure the appliance
+  hosts: "{{ vm_name }}"
+  vars_files:
+    - group_vars/all
+  roles:
+    #- deploy_appliance
+    - configure_appliance
