@@ -35,6 +35,7 @@
         - python34-setuptools
         - gcc
         - ansible
+        - lvm2
 
     - name: Inject xml2json
       copy:
@@ -58,6 +59,7 @@
     - "{{ obackup_location }}/backup/plans"
     - "{{ obackup_location }}/backup/vms"
     - "{{ backy2_location }}"
+    - /var/lib/backy2
     - "{{ backup_mountpoint_path }}"
   tags: create_dirs
 

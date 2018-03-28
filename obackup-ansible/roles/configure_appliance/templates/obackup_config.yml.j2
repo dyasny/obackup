@@ -5,5 +5,10 @@
     password: {{ ovirt_password }}
     ca_file: {{ obackup_location }}/ca.crt
 
-- appliance_configuration
-    bkpvm: {{ appliance_vm_id.stdout | lower }}
+- appliance_configuration:
+    backup_vm_name: obackup
+    application_name: obackup
+    plan_path: {{ obackup_location }}/backup/plans
+    vms_path: {{ obackup_location }}/backup/vms
+    log: /var/log/obackup.log
+    disk_operations_timeout: 15

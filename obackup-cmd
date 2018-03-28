@@ -5,6 +5,7 @@ import traceback
 import yaml
 from prettytable import PrettyTable
 import sys
+from lib.backup import backup
 
 try:
     import ovirtsdk4 as sdk
@@ -21,33 +22,41 @@ def connect():
     with open(config, 'r') as f:
         conf = yaml.load(f.read())
 
-    connection = sdk.Connection(
-        url=conf['ovirt_connectivity']['url'],
-        username=conf['ovirt_connectivity']['user'],
-        password=str(conf['ovirt_connectivity']['password']),
-        ca_file=conf['ovirt_connectivity']['ca_file'],
-        insecure="insecure"
-        )
-    return connection
+    logging.basicConfig(level=logging.DEBUG,
+                        filename=conf['appliance_configuration']['log'])
 
-def load_plan(plan):
-    if os.environ.has_key('OBACKUP_PATH'):
-        obackup_path = os.environ['OBACKUP_PATH']
-    else:
-        obackup_path = "/opt/obackup/"
-    plan_path = obackup_path + "/backup/plans" + plan + ".yml"
+    try:
+        connection = sdk.Connection(
+            url=conf['ovirt_connectivity']['url'],
+            username=conf['ovirt_connectivity']['user'],
+            password=str(conf['ovirt_connectivity']['password']),
+            ca_file=conf['ovirt_connectivity']['ca_file'],
+            insecure="insecure"
+            )
+        logging.info('Connected to the server.')
+    except Exception, e:
+        print("Unknown exception connecting to engine %s" % str(e))
+        logging.error('Failed to connect to server with %s' % str(e))
+
+    return connection, conf
+
+def load_plan(plan_name):
+    plan_path = (
+        '%s/%s.yml',
+        CONF['appliance_configuration']['plan_path'], plan_name
+    )
     with open(plan_path, 'r') as f:
         p = yaml.load(f.read())
     return p
 
 def save_plan(plan):
-    if os.environ.has_key('OBACKUP_PATH'):
-        obackup_path = os.environ['OBACKUP_PATH']
-    else:
-        obackup_path = "/opt/obackup/"
-    plan_path = obackup_path + "/backup/plans/" + plan['name'] + ".yml"
+    plan_path = (
+        '%s/%s.yml',
+        CONF['appliance_configuration']['plan_path'], plan['name']
+    )
+
     if os.isfile(plan_path):
-        print("Plan %s already exists, will be overwritten" % plan)
+        print("Plan %s already exists, will be overwritten" % plan['name'])
     else:
         with open(plan_path,'w') as f:
             f.write(yaml.dump(plan))
@@ -131,7 +140,13 @@ def run_plan(conn, plan_name):
         vmid, disks = get_vm_disks(conn, vmname)
         if vm['disks'] != ['all']:
             disks = vm['disks']
-        backup_vm(conn, vmname, vmid, disks)
+        backup_vm(conn, vmname, disks)
 
-def backup_vm(conn, vm, vmid, disks):
-    pass
+def backup_vm(conn, vm, disks):
+    backup(conn, CONF['appliance_configuration']['backup_vm_name'], vm,
+           CONF['appliance_configuration']['application_name'], disks, CONF)
+
+def main():
+    conn, conf = connect()
+    global CONF
+    CONF = conf
